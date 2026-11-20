@@ -56,6 +56,15 @@ pub struct Received {
     pub time: u64,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct HistoryEntry {
+    pub name: String,
+    pub size: u64,
+    /// true = z telefonu na PC, false = z PC do telefonu
+    pub from_phone: bool,
+    pub time: u64,
+}
+
 #[derive(Clone)]
 pub struct Progress {
     pub name: String,
@@ -68,6 +77,7 @@ pub struct Inner {
     pub config: Config,
     pub queue: Vec<QueueItem>,
     pub received: Vec<Received>,
+    pub history: Vec<HistoryEntry>,
     pub progress: HashMap<String, Progress>,
 }
 
@@ -188,8 +198,9 @@ impl Shared {
         let mut queue: Vec<QueueItem> = load_json(&dir.join("queue.json")).unwrap_or_default();
         queue.retain(|q| q.path.is_file());
         let received: Vec<Received> = load_json(&dir.join("received.json")).unwrap_or_default();
+        let history: Vec<HistoryEntry> = load_json(&dir.join("history.json")).unwrap_or_default();
         let s = Arc::new(Shared {
-            inner: Mutex::new(Inner { config, queue, received, progress: HashMap::new() }),
+            inner: Mutex::new(Inner { config, queue, received, history, progress: HashMap::new() }),
             dir,
             ctx: Mutex::new(None),
         });
@@ -257,7 +268,23 @@ impl Shared {
         Ok(())
     }
 
+    pub fn add_history(&self, name: &str, size: u64, from_phone: bool) {
+        let h = {
+            let mut g = self.lock();
+            g.history.insert(0, HistoryEntry { name: name.to_string(), size, from_phone, time: now_secs() });
+            g.history.truncate(1000);
+            g.history.clone()
+        };
+        save_json(&self.dir.join("history.json"), &h);
+    }
+
+    pub fn clear_history(&self) {
+        self.lock().history.clear();
+        save_json(&self.dir.join("history.json"), &Vec::<HistoryEntry>::new());
+    }
+
     pub fn add_received(&self, r: Received) {
+        self.add_history(&r.name, r.size, true);
         {
             let mut g = self.lock();
             g.received.insert(0, r);

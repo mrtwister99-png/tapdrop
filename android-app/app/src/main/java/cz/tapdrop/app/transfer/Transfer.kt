@@ -113,7 +113,6 @@ class Transfer(private val ctx: Context, private val prefs: Prefs, private val h
                 throw TapError(ErrorKind.OTHER, "Odeslání „$name“ selhalo: ${e.message}")
             }
         }
-        if (prefs.queue.isEmpty()) prefs.readyToSend = false
         return okCount
     }
 

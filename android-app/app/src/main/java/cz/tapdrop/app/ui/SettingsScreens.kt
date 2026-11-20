@@ -2,7 +2,6 @@ package cz.tapdrop.app.ui
 
 import android.content.Intent
 import android.net.Uri
-import android.nfc.NfcAdapter
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -22,7 +21,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
-import androidx.compose.material.icons.rounded.Nfc
 import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -57,9 +55,7 @@ import com.journeyapps.barcodescanner.ScanOptions
 import cz.tapdrop.app.TapApp
 import cz.tapdrop.app.net.Discovery
 import cz.tapdrop.app.net.TapError
-import cz.tapdrop.app.nfc.Nfc
-import cz.tapdrop.app.nfc.NfcBus
-import cz.tapdrop.app.nfc.WriteState
+import cz.tapdrop.app.transfer.PollService
 import kotlinx.coroutines.launch
 
 @Composable
@@ -105,6 +101,11 @@ fun SettingsScreen(nav: NavController, snack: SnackbarHostState) {
                     "Po přiložení tagu se soubory z notebooku stáhnou samy, bez dialogu.",
                     prefs.autoDownload,
                 ) { prefs.autoDownload = it }
+                HorizontalDivider()
+                SettingRow("Zůstat připojený na pozadí", "Telefon hlídá notebook a stahuje soubory hned, jak je přetáhneš do okna.", prefs.keepAlive) {
+                    prefs.keepAlive = it
+                    if (it) PollService.start(ctx) else PollService.stop(ctx)
+                }
                 HorizontalDivider()
                 SettingRow("Notifikace", "Oznámení „Odesláno“ / „Staženo“.", prefs.notifications) { prefs.notifications = it }
                 HorizontalDivider()
@@ -169,7 +170,6 @@ fun SettingsScreen(nav: NavController, snack: SnackbarHostState) {
             }
         }
 
-        OutlinedButton(onClick = { nav.navigate("writetag") }, Modifier.fillMaxWidth()) { Text("Zapsat tag") }
         Text(
             "TapDrop 1.0.0 · komunikace probíhá jen v lokální síti",
             style = MaterialTheme.typography.bodySmall,
@@ -209,7 +209,7 @@ fun PairScreen(nav: NavController) {
             scope.launch {
                 state = try {
                     val api = Discovery.connect(ctx, prefs)
-                    PairState.Ok(api.discover().name)
+                    run { PollService.start(ctx); PairState.Ok(api.discover().name) }
                 } catch (e: TapError) {
                     PairState.Fail("${e.title}. ${TapError.hint(e.kind)} (uloženo: $ip:$port)")
                 } catch (e: Exception) {
@@ -225,7 +225,7 @@ fun PairScreen(nav: NavController) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Icon(Icons.Rounded.QrCodeScanner, null, Modifier.size(96.dp), tint = MaterialTheme.colorScheme.primary)
-        Text("Na notebooku spusť TapDrop – v okně uvidíš QR kód. Naskenuj ho.", textAlign = TextAlign.Center)
+        Text("Na notebooku spusť TapDrop – v okně uvidíš QR kód. Naskenuj ho a hotovo, víc nepotřebuješ.", textAlign = TextAlign.Center)
         Button(
             onClick = {
                 scanner.launch(
@@ -246,8 +246,7 @@ fun PairScreen(nav: NavController) {
                 is PairState.Ok -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Rounded.CheckCircle, null, tint = OkGreen, modifier = Modifier.size(48.dp))
                     Text("Spárováno s notebookem ${s.name}", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
-                    Button(onClick = { nav.navigate("writetag") }) { Text("Pokračovat: zapsat tag") }
-                    TextButton(onClick = { nav.popBackStack() }) { Text("Hotovo") }
+                    Button(onClick = { nav.popBackStack() }) { Text("Hotovo") }
                 }
                 is PairState.Fail -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Rounded.ErrorOutline, null, tint = WarnRed, modifier = Modifier.size(48.dp))
@@ -258,66 +257,3 @@ fun PairScreen(nav: NavController) {
     }
 }
 
-// ============================================================ ZAPSAT TAG
-@Composable
-fun WriteTagScreen() {
-    val ctx = LocalContext.current
-    val prefs = TapApp.prefs
-    val state by NfcBus.writeState.collectAsState()
-    val nfcOn = NfcAdapter.getDefaultAdapter(ctx)?.isEnabled == true
-
-    DisposableEffect(Unit) {
-        if (prefs.paired) {
-            NfcBus.writeState.value = WriteState.Waiting
-            NfcBus.writeUri.value = Nfc.tagUri(prefs.notebookId)
-        }
-        onDispose {
-            NfcBus.writeUri.value = null
-            NfcBus.writeState.value = WriteState.Idle
-        }
-    }
-
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-    ) {
-        if (!prefs.paired) {
-            Icon(Icons.Rounded.ErrorOutline, null, Modifier.size(72.dp), tint = WarnRed)
-            Text("Nejdřív spáruj telefon s notebookem.", textAlign = TextAlign.Center)
-            return@Column
-        }
-        if (!nfcOn) {
-            Icon(Icons.Rounded.ErrorOutline, null, Modifier.size(72.dp), tint = WarnRed)
-            Text("NFC je vypnuto.", style = MaterialTheme.typography.titleMedium)
-            Button(onClick = { ctx.startActivity(Intent(Settings.ACTION_NFC_SETTINGS)) }) { Text("Otevřít nastavení NFC") }
-            return@Column
-        }
-        AnimatedContent(state, label = "write") { s ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                when (s) {
-                    is WriteState.Success -> {
-                        Icon(Icons.Rounded.CheckCircle, null, Modifier.size(96.dp), tint = OkGreen)
-                        Text("Tag je zapsaný", style = MaterialTheme.typography.headlineSmall)
-                        Text("Nalep ho vedle notebooku. Od teď stačí k němu přiložit telefon.", textAlign = TextAlign.Center)
-                    }
-                    is WriteState.Failed -> {
-                        Icon(Icons.Rounded.ErrorOutline, null, Modifier.size(96.dp), tint = WarnRed)
-                        Text("Zápis se nepodařil", style = MaterialTheme.typography.headlineSmall)
-                        Text(s.reason, textAlign = TextAlign.Center, color = WarnRed)
-                        Text("Přilož tag znovu.", textAlign = TextAlign.Center)
-                    }
-                    else -> {
-                        Icon(Icons.Rounded.Nfc, null, Modifier.size(96.dp), tint = MaterialTheme.colorScheme.primary)
-                        Text("Přilož prázdný NFC tag k zadní straně telefonu", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
-                    }
-                }
-            }
-        }
-        Text(
-            "Zapíše se: ${Nfc.tagUri(prefs.notebookId)}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}

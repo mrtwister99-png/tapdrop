@@ -43,13 +43,12 @@ class TransferService : Service() {
         )
         if (busy) return START_NOT_STICKY
         busy = true
-        val action = intent?.action ?: ACTION_TAP
-        val tagId = intent?.getStringExtra(EXTRA_TAG_ID)
+        val action = intent?.action ?: ACTION_DOWNLOAD
         acquireLocks()
 
         scope.launch {
             try {
-                run(action, tagId)
+                run(action)
             } finally {
                 TransferBus.idle()
                 releaseLocks()
@@ -74,7 +73,7 @@ class TransferService : Service() {
         return START_NOT_STICKY
     }
 
-    private suspend fun run(action: String, tagId: String?) {
+    private suspend fun run(action: String) {
         val prefs = TapApp.prefs
         val ctx = applicationContext
         val transfer = Transfer(ctx, prefs, TapApp.history)
@@ -82,7 +81,6 @@ class TransferService : Service() {
         TransferBus.update(TransferUi(active = true, phase = "Hledám notebook…"))
         try {
             val api = Discovery.connect(ctx, prefs)
-            if (tagId != null && tagId != prefs.notebookId) throw TapError(ErrorKind.WRONG_TAG)
 
             var sent = 0
             var received = 0
@@ -90,21 +88,17 @@ class TransferService : Service() {
 
             val wantUpload = when (action) {
                 ACTION_UPLOAD -> prefs.queue.isNotEmpty()
-                ACTION_TAP -> prefs.readyToSend && prefs.queue.isNotEmpty()
                 else -> false
             }
             if (wantUpload) sent = transfer.uploadQueue(api)
 
             val wantDownload = when (action) {
                 ACTION_DOWNLOAD -> true
-                ACTION_TAP -> prefs.autoDownload
                 else -> false
             }
             if (wantDownload) {
                 // TADY NENÍ ŽÁDNÝ DIALOG: stáhne se všechno, co čeká na PC
                 received = transfer.downloadAll(api)
-            } else if (action == ACTION_TAP) {
-                waiting = api.pending().size
             }
 
             val parts = mutableListOf<String>()
@@ -120,7 +114,7 @@ class TransferService : Service() {
                 detail = "Automatické stahování je vypnuté – stáhni je v záložce Přijato."
             } else {
                 title = "Není co přenášet"
-                detail = "Nic není připraveno k odeslání a na notebooku nic nečeká."
+                detail = "Nic není ve frontě a na notebooku nic nečeká."
             }
             val ok = true
             TransferBus.setResult(TransferResult(ok, title, detail))
@@ -171,14 +165,11 @@ class TransferService : Service() {
 
     companion object {
         private const val TAG = "TapDrop.Service"
-        const val ACTION_TAP = "cz.tapdrop.app.TAP"
         const val ACTION_UPLOAD = "cz.tapdrop.app.UPLOAD"
         const val ACTION_DOWNLOAD = "cz.tapdrop.app.DOWNLOAD"
-        const val EXTRA_TAG_ID = "tag_id"
 
-        fun start(ctx: Context, action: String, tagId: String? = null) {
+        fun start(ctx: Context, action: String) {
             val i = Intent(ctx, TransferService::class.java).setAction(action)
-            if (tagId != null) i.putExtra(EXTRA_TAG_ID, tagId)
             ContextCompat.startForegroundService(ctx, i)
         }
     }

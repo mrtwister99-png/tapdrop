@@ -56,7 +56,6 @@ private fun titleFor(route: String?) = when (route) {
     "history" -> "Historie"
     "settings" -> "Nastavení"
     "pair" -> "Spárovat s notebookem"
-    "writetag" -> "Zapsat tag"
     else -> "TapDrop"
 }
 
@@ -129,7 +128,6 @@ fun AppRoot() {
             composable("history") { HistoryScreen() }
             composable("settings") { SettingsScreen(nav, snack) }
             composable("pair") { PairScreen(nav) }
-            composable("writetag") { WriteTagScreen() }
         }
     }
 }

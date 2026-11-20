@@ -5,3 +5,4 @@ android-app/build/
 android-app/app/build/
 *.apk
 .idea/
+dist/

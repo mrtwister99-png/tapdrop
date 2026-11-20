@@ -196,11 +196,12 @@ async fn download(State(s): State<S>, AxPath(id): AxPath<String>, headers: Heade
 async fn ack(State(s): State<S>, AxPath(id): AxPath<String>) -> Response {
     let removed = {
         let mut g = s.lock();
-        let before = g.queue.len();
+        let item = g.queue.iter().find(|q| q.id == id).cloned();
         g.queue.retain(|q| q.id != id);
-        before != g.queue.len()
+        item
     };
-    if removed {
+    if let Some(item) = removed {
+        s.add_history(&item.name, item.size, false);
         s.save_queue();
         s.repaint();
         tracing::info!("Potvrzeno staženo, odstraněno z fronty: {id}");

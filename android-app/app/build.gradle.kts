@@ -15,8 +15,21 @@ android {
         versionName = "1.0.0"
     }
 
+    signingConfigs {
+        create("release") {
+            val ks = rootProject.file("tapdrop-release.jks")
+            if (ks.exists()) {
+                storeFile = ks
+                storePassword = "tapdrop123"
+                keyAlias = "tapdrop"
+                keyPassword = "tapdrop123"
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = if (rootProject.file("tapdrop-release.jks").exists()) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }

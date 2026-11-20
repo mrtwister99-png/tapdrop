@@ -2,8 +2,6 @@ package cz.tapdrop.app.ui
 
 import android.content.Intent
 import android.net.Uri
-import android.nfc.NfcAdapter
-import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.RepeatMode
@@ -36,7 +34,9 @@ import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.Nfc
+import androidx.compose.material.icons.rounded.QrCodeScanner
+import androidx.compose.material.icons.rounded.Wifi
+import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.rounded.UploadFile
@@ -76,6 +76,7 @@ import cz.tapdrop.app.net.TapError
 import cz.tapdrop.app.net.czFiles
 import cz.tapdrop.app.net.humanSize
 import cz.tapdrop.app.transfer.FileMeta
+import cz.tapdrop.app.transfer.PollBus
 import cz.tapdrop.app.transfer.TransferBus
 import cz.tapdrop.app.transfer.TransferService
 import kotlinx.coroutines.delay
@@ -88,26 +89,13 @@ fun HomeScreen(nav: NavController) {
     val prefs = TapApp.prefs
     val ui by TransferBus.ui.collectAsState()
     val result by TransferBus.result.collectAsState()
-
-    var nfcState by remember { mutableStateOf(nfcStatus(ctx)) }
-    LaunchedEffect(Unit) { while (true) { nfcState = nfcStatus(ctx); delay(1500) } }
+    val connected by PollBus.connected.collectAsState()
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        NfcPulse(active = ui.active)
-
-        when {
-            nfcState == NfcStatus.MISSING -> InfoCard("Telefon nemá NFC", "TapDrop bez NFC nefunguje. Odesílat a stahovat lze jen tlačítky v aplikaci.")
-            nfcState == NfcStatus.OFF -> Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("NFC je vypnuto", style = MaterialTheme.typography.titleMedium)
-                    Text("Zapni NFC, aby šlo tagy číst.", style = MaterialTheme.typography.bodyMedium)
-                    TextButton(onClick = { ctx.startActivity(Intent(Settings.ACTION_NFC_SETTINGS)) }) { Text("Otevřít nastavení NFC") }
-                }
-            }
-        }
+        Hero(paired = prefs.paired, connected = connected, active = ui.active)
 
         if (ui.active) TransferCard(ui)
         result?.let { if (!ui.active) ResultCard(it, onDismiss = { TransferBus.setResult(null) }) }
@@ -116,7 +104,7 @@ fun HomeScreen(nav: NavController) {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Telefon ještě není spárovaný", style = MaterialTheme.typography.titleMedium)
-                    Text("Spusť TapDrop na notebooku a naskenuj QR kód z jeho okna.")
+                    Text("Spusť TapDrop na notebooku a naskenuj QR kód z jeho okna. Víc není potřeba.")
                     Button(onClick = { nav.navigate("pair") }, Modifier.fillMaxWidth()) { Text("Spárovat s notebookem") }
                 }
             }
@@ -126,9 +114,7 @@ fun HomeScreen(nav: NavController) {
                     Text("Spárováno", style = MaterialTheme.typography.titleMedium)
                     Text("Notebook ${prefs.notebookId} · ${prefs.host}:${prefs.port}", style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        if (prefs.readyToSend && prefs.queue.isNotEmpty())
-                            "K odeslání: ${czFiles(prefs.queue.size)} – přilož telefon k tagu"
-                        else "Přilož telefon k tagu: stáhne se vše, co čeká na notebooku.",
+                        "Soubory přetažené do okna TapDrop na notebooku se sem stáhnou samy. Odesílání je v záložce Odeslat.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -139,50 +125,43 @@ fun HomeScreen(nav: NavController) {
                     onClick = { TransferService.start(ctx, TransferService.ACTION_DOWNLOAD) },
                     Modifier.weight(1f), enabled = !ui.active,
                 ) { Text("Stáhnout teď") }
-                OutlinedButton(onClick = { nav.navigate("writetag") }, Modifier.weight(1f)) { Text("Zapsat tag") }
+                OutlinedButton(onClick = { nav.navigate("send") }, Modifier.weight(1f)) { Text("Odeslat soubory") }
             }
         }
     }
 }
 
-private enum class NfcStatus { OK, OFF, MISSING }
-
-private fun nfcStatus(ctx: android.content.Context): NfcStatus {
-    val a = NfcAdapter.getDefaultAdapter(ctx) ?: return NfcStatus.MISSING
-    return if (a.isEnabled) NfcStatus.OK else NfcStatus.OFF
-}
-
 @Composable
-private fun NfcPulse(active: Boolean) {
+private fun Hero(paired: Boolean, connected: Boolean?, active: Boolean) {
     val t = rememberInfiniteTransition(label = "pulse")
     val s by t.animateFloat(
-        1f, 1.55f, infiniteRepeatable(tween(if (active) 700 else 1600), RepeatMode.Restart), label = "s",
+        1f, 1.55f, infiniteRepeatable(tween(if (active) 700 else 1800), RepeatMode.Restart), label = "s",
     )
     val a by t.animateFloat(
-        0.45f, 0f, infiniteRepeatable(tween(if (active) 700 else 1600), RepeatMode.Restart), label = "a",
+        0.45f, 0f, infiniteRepeatable(tween(if (active) 700 else 1800), RepeatMode.Restart), label = "a",
     )
+    val ok = paired && connected == true
+    val color = if (ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
     Box(Modifier.fillMaxWidth().height(190.dp), contentAlignment = Alignment.Center) {
-        Box(Modifier.size(110.dp).scale(s).alpha(a).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
-        Box(
-            Modifier.size(110.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
-            contentAlignment = Alignment.Center,
-        ) { Icon(Icons.Rounded.Nfc, null, Modifier.size(56.dp), tint = Color.White) }
+        if (ok) Box(Modifier.size(110.dp).scale(s).alpha(a).clip(CircleShape).background(color))
+        Box(Modifier.size(110.dp).clip(CircleShape).background(color), contentAlignment = Alignment.Center) {
+            Icon(
+                when { !paired -> Icons.Rounded.QrCodeScanner; ok -> Icons.Rounded.Wifi; else -> Icons.Rounded.WifiOff },
+                null, Modifier.size(56.dp), tint = Color.White,
+            )
+        }
         Text(
-            if (active) "Přenáším…" else "Přilož telefon k tagu u notebooku",
+            when {
+                active -> "Přenáším…"
+                !paired -> "Nespárováno"
+                connected == true -> "Připojeno k notebooku"
+                connected == false -> "Notebook není dostupný"
+                else -> "Připojuji…"
+            },
             Modifier.align(Alignment.BottomCenter),
             style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center,
         )
-    }
-}
-
-@Composable
-private fun InfoCard(title: String, text: String) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(text, style = MaterialTheme.typography.bodyMedium)
-        }
     }
 }
 
@@ -212,13 +191,13 @@ fun SendScreen(nav: NavController) {
                 Icon(Icons.Rounded.UploadFile, null); Spacer(Modifier.size(8.dp)); Text("Vybrat soubory")
             }
             if (prefs.queue.isNotEmpty()) {
-                TextButton(onClick = { prefs.queue.clear(); prefs.saveQueue(); prefs.readyToSend = false }) { Text("Vyprázdnit") }
+                TextButton(onClick = { prefs.queue.clear(); prefs.saveQueue() }) { Text("Vyprázdnit") }
             }
         }
         Spacer(Modifier.height(8.dp))
 
         if (prefs.queue.isEmpty()) {
-            EmptyState(Icons.Rounded.Description, "Žádné soubory", "Vyber soubory (jakýkoli typ, i víc najednou), pak stiskni „Připraveno k odeslání“ a přilož telefon k tagu.", Modifier.weight(1f))
+            EmptyState(Icons.Rounded.Description, "Žádné soubory", "Vyber soubory (jakýkoli typ, i víc najednou) a stiskni „Odeslat do notebooku“.", Modifier.weight(1f))
         } else {
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(prefs.queue.toList(), key = { it }) { s ->
@@ -240,23 +219,12 @@ fun SendScreen(nav: NavController) {
         Spacer(Modifier.height(8.dp))
         if (!prefs.paired) {
             Button(onClick = { nav.navigate("pair") }, Modifier.fillMaxWidth()) { Text("Nejdřív spárovat s notebookem") }
-        } else if (prefs.readyToSend && prefs.queue.isNotEmpty()) {
-            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Rounded.Nfc, null, Modifier.size(40.dp))
-                    Text("Připraveno – přilož telefon k tagu", style = MaterialTheme.typography.titleMedium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = { prefs.readyToSend = false }) { Text("Zrušit") }
-                        TextButton(onClick = { TransferService.start(ctx, TransferService.ACTION_UPLOAD) }, enabled = !ui.active) { Text("Odeslat hned bez tagu") }
-                    }
-                }
-            }
         } else {
             Button(
-                onClick = { prefs.readyToSend = true },
+                onClick = { TransferService.start(ctx, TransferService.ACTION_UPLOAD) },
                 Modifier.fillMaxWidth().height(56.dp),
-                enabled = prefs.queue.isNotEmpty(),
-            ) { Icon(Icons.Rounded.Send, null); Spacer(Modifier.size(8.dp)); Text("Připraveno k odeslání") }
+                enabled = prefs.queue.isNotEmpty() && !ui.active,
+            ) { Icon(Icons.Rounded.Send, null); Spacer(Modifier.size(8.dp)); Text("Odeslat do notebooku") }
         }
         Spacer(Modifier.height(12.dp))
     }
@@ -318,7 +286,7 @@ fun ReceivedScreen(snack: SnackbarHostState) {
         }
         Spacer(Modifier.height(10.dp))
         if (received.isEmpty()) {
-            EmptyState(Icons.Rounded.CloudDownload, "Zatím nic nepřišlo", "Soubory z notebooku se stáhnou samy, jakmile přiložíš telefon k tagu.", Modifier.weight(1f))
+            EmptyState(Icons.Rounded.CloudDownload, "Zatím nic nepřišlo", "Soubory přetažené do okna TapDrop na notebooku se stáhnou samy.", Modifier.weight(1f))
         } else {
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(received) { h -> HistoryRow(h) { openFile(ctx, h.uri, snack, scope) } }

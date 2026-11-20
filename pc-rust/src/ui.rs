@@ -12,7 +12,8 @@ static QUITTING: AtomicBool = AtomicBool::new(false);
 
 const ACCENT: Color32 = Color32::from_rgb(76, 139, 245);
 const OK_GREEN: Color32 = Color32::from_rgb(70, 190, 120);
-const CARD: Color32 = Color32::from_rgb(30, 34, 44);
+const CARD: Color32 = Color32::from_rgb(24, 46, 92);
+const BG: Color32 = Color32::from_rgb(10, 22, 50);
 
 pub fn run(shared: Arc<Shared>, start_hidden: bool) {
     let (w, h) = {
@@ -69,6 +70,7 @@ fn make_icon(size: u32) -> Vec<u8> {
 #[derive(PartialEq, Clone, Copy)]
 enum Tab {
     Home,
+    History,
     Settings,
 }
 
@@ -123,8 +125,9 @@ impl TapDropApp {
 
 fn setup_style(ctx: &egui::Context) {
     let mut v = egui::Visuals::dark();
-    v.panel_fill = Color32::from_rgb(20, 23, 30);
-    v.window_fill = Color32::from_rgb(24, 27, 35);
+    v.panel_fill = BG;
+    v.window_fill = Color32::from_rgb(14, 30, 64);
+    v.extreme_bg_color = Color32::from_rgb(8, 16, 38);
     v.widgets.noninteractive.bg_fill = CARD;
     v.selection.bg_fill = ACCENT;
     v.hyperlink_color = ACCENT;
@@ -285,9 +288,9 @@ impl eframe::App for TapDropApp {
         let hovering = ctx.input(|i| !i.raw.hovered_files.is_empty());
 
         // --- snapshot stavu
-        let (cfg, queue, received, progress) = {
+        let (cfg, queue, received, progress, history) = {
             let g = self.shared.lock();
-            (g.config.clone(), g.queue.clone(), g.received.clone(), g.progress.clone())
+            (g.config.clone(), g.queue.clone(), g.received.clone(), g.progress.clone(), g.history.clone())
         };
         if !progress.is_empty() {
             ctx.request_repaint_after(Duration::from_millis(150));
@@ -312,6 +315,7 @@ impl eframe::App for TapDropApp {
                 ui.label(RichText::new(format!("{}:{}", self.ip, cfg.port)).monospace());
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.selectable_value(&mut self.tab, Tab::Settings, "Nastavení");
+                    ui.selectable_value(&mut self.tab, Tab::History, "Historie");
                     ui.selectable_value(&mut self.tab, Tab::Home, "Přehled");
                 });
             });
@@ -365,6 +369,7 @@ impl eframe::App for TapDropApp {
 
         egui::CentralPanel::default().show(ctx, |ui| match self.tab {
             Tab::Home => self.home(ui, ctx, hovering, &cfg, &queue, &received, &progress, &mut actions),
+            Tab::History => self.history_tab(ui, &history),
             Tab::Settings => self.settings(ui, &cfg),
         });
 
@@ -507,6 +512,34 @@ impl TapDropApp {
                     });
                 }
             });
+        });
+    }
+
+    fn history_tab(&mut self, ui: &mut egui::Ui, history: &[HistoryEntry]) {
+        ui.horizontal(|ui| {
+            ui.label(RichText::new(format!("Historie přenosů ({})", history.len())).strong().size(18.0));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui.button("Vymazat historii").clicked() {
+                    self.shared.clear_history();
+                }
+            });
+        });
+        egui::ScrollArea::vertical().id_salt("h").show(ui, |ui| {
+            if history.is_empty() {
+                empty_state(ui, "Historie je prázdná", "Zde uvidíš všechny soubory poslané do telefonu i přijaté z telefonu.");
+            }
+            for h in history {
+                card(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        let (txt, col) = if h.from_phone { ("↓ z telefonu", OK_GREEN) } else { ("↑ do telefonu", ACCENT) };
+                        ui.label(RichText::new(txt).color(col).strong());
+                        ui.vertical(|ui| {
+                            ui.label(RichText::new(&h.name).strong());
+                            ui.label(RichText::new(format!("{} · {}", human_size(h.size), ago(h.time))).weak().small());
+                        });
+                    });
+                });
+            }
         });
     }
 

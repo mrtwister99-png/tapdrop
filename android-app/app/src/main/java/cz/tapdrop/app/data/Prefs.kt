@@ -58,7 +58,7 @@ class Prefs(ctx: Context) {
     var downloadTreeName by PrefState(sp, "download_tree_name", "")
 
     // --- fronta k odeslání
-    var readyToSend by PrefState(sp, "ready_to_send", false)
+    var keepAlive by PrefState(sp, "keep_alive", true)
     val queue = mutableStateListOf<String>().also { list ->
         runCatching {
             val arr = JSONArray(sp.getString("queue", "[]"))
