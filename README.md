@@ -26,6 +26,8 @@ cargo build --release
 
 Výsledek: `pc-rust\target\release\TapDrop.exe` – jeden samostatný soubor, stačí ho zkopírovat kamkoli.
 
+Hotový **instalátor** (`TapDrop-Setup.exe`) se staví přes [Inno Setup](https://jrsoftware.org/isinfo.php): `ISCC.exe installer	apdrop.iss` → `distTapDrop-Setup.exe`.
+
 ### Android aplikace
 
 Otevři složku `android-app` v **Android Studiu** (Koala nebo novější, JDK 17+) a stiskni Run, nebo z příkazové řádky:
