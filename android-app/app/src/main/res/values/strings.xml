@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TapDrop</string>
+    <string name="widget_title">TapDrop</string>
+    <string name="widget_subtitle">Rychle odeslat soubor</string>
+    <string name="widget_description">Rychlé odeslání souboru do notebooku</string>
+</resources>
