@@ -7,6 +7,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.History

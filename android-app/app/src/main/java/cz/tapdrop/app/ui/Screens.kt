@@ -31,6 +31,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
