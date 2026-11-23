@@ -129,6 +129,14 @@ class TransferService : Service() {
             throw e
         } catch (e: TapError) {
             Log.w(TAG, "Chyba: ${e.kind} ${e.message}")
+            if (action == ACTION_UPLOAD && prefs.queue.isNotEmpty() &&
+                (e.kind == ErrorKind.WIFI_OFF || e.kind == ErrorKind.NOT_FOUND)
+            ) {
+                // offline: soubory zůstávají ve frontě a odešlou se samy po připojení
+                prefs.sendWhenOnline = true
+                fail("Čeká na připojení", "Soubory se odešlou automaticky, jakmile bude notebook dostupný.")
+                return
+            }
             fail(e.title, if (e.message != null && e.message != e.title) "${e.message}" else TapError.hint(e.kind))
         } catch (e: Exception) {
             Log.e(TAG, "Neočekávaná chyba", e)

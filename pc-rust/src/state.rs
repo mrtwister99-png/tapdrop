@@ -80,6 +80,8 @@ pub struct Inner {
     pub history: Vec<HistoryEntry>,
     pub progress: HashMap<String, Progress>,
     pub odhoz_text: String,
+    /// Poslední ověřený požadavek z telefonu: (IP, čas)
+    pub phone_seen: Option<(String, std::time::Instant)>,
 }
 
 pub struct Shared {
@@ -201,7 +203,7 @@ impl Shared {
         let received: Vec<Received> = load_json(&dir.join("received.json")).unwrap_or_default();
         let history: Vec<HistoryEntry> = load_json(&dir.join("history.json")).unwrap_or_default();
         let s = Arc::new(Shared {
-            inner: Mutex::new(Inner { config, queue, received, history, progress: HashMap::new(), odhoz_text: String::new() }),
+            inner: Mutex::new(Inner { config, queue, received, history, progress: HashMap::new(), odhoz_text: String::new(), phone_seen: None }),
             dir,
             ctx: Mutex::new(None),
         });
@@ -230,6 +232,18 @@ impl Shared {
 
     pub fn token(&self) -> String {
         self.lock().config.token.clone()
+    }
+
+    pub fn touch_phone(&self, ip: String) {
+        self.lock().phone_seen = Some((ip, std::time::Instant::now()));
+    }
+
+    /// Telefon je „připojen“, pokud se ozval v posledních 10 s (pending se volá každé 3 s).
+    pub fn connected_phone(&self) -> Option<String> {
+        match &self.lock().phone_seen {
+            Some((ip, t)) if t.elapsed() < std::time::Duration::from_secs(10) => Some(ip.clone()),
+            _ => None,
+        }
     }
 
     pub fn odhoz_text(&self) -> String {

@@ -59,6 +59,8 @@ class Prefs(ctx: Context) {
 
     // --- fronta k odeslání
     var keepAlive by PrefState(sp, "keep_alive", true)
+    /** Odeslání je „zadržené“: odešle se samo, jakmile se telefon spojí s notebookem. */
+    var sendWhenOnline by PrefState(sp, "send_when_online", false)
     val queue = mutableStateListOf<String>().also { list ->
         runCatching {
             val arr = JSONArray(sp.getString("queue", "[]"))

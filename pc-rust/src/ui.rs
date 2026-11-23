@@ -128,7 +128,34 @@ impl TapDropApp {
     }
 }
 
+/// Ikonka telefonu: zelená s odškrtnutím = připojeno, šedá s pomlčkou = nepřipojeno.
+fn phone_indicator(ui: &mut egui::Ui, phone: Option<String>) {
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(26.0, 26.0), egui::Sense::hover());
+    let p = ui.painter();
+    let on = phone.is_some();
+    let col = if on { OK_GREEN } else { Color32::from_gray(120) };
+    let body = egui::Rect::from_center_size(rect.center() - Vec2::new(2.0, 0.0), Vec2::new(12.0, 20.0));
+    p.rect_stroke(body, 3.0, Stroke::new(1.6, col));
+    p.line_segment([body.center_bottom() - Vec2::new(2.0, 3.0), body.center_bottom() - Vec2::new(-2.0, 3.0)], Stroke::new(1.4, col));
+    // odznak vpravo dole
+    let c = rect.right_bottom() - Vec2::new(6.0, 6.0);
+    p.circle_filled(c, 6.0, col);
+    let w = Stroke::new(1.6, Color32::WHITE);
+    if on {
+        p.line_segment([c + Vec2::new(-3.0, 0.0), c + Vec2::new(-1.0, 2.2)], w);
+        p.line_segment([c + Vec2::new(-1.0, 2.2), c + Vec2::new(3.0, -2.5)], w);
+    } else {
+        p.line_segment([c + Vec2::new(-3.0, 0.0), c + Vec2::new(3.0, 0.0)], w);
+    }
+    let tip = match phone {
+        Some(ip) => format!("Aktuálně připojeno s telefonem ({ip})"),
+        None => "Nepřipojeno".to_string(),
+    };
+    resp.on_hover_text(tip);
+}
+
 fn setup_style(ctx: &egui::Context) {
+    ctx.set_theme(egui::Theme::Dark);
     let mut v = egui::Visuals::dark();
     v.panel_fill = BG;
     v.window_fill = Color32::from_rgb(26, 26, 26);
@@ -329,6 +356,7 @@ impl eframe::App for TapDropApp {
                     ui.selectable_value(&mut self.tab, Tab::History, "Historie");
                     ui.selectable_value(&mut self.tab, Tab::Odhoz, "Odhoz");
                     ui.selectable_value(&mut self.tab, Tab::Home, "Přehled");
+                    phone_indicator(ui, self.shared.connected_phone());
                 });
             });
             ui.add_space(6.0);
@@ -693,6 +721,14 @@ fn normalize_odhoz_text(text: &str) -> String {
 #[cfg(test)]
 mod odhoz_ui_tests {
     use super::*;
+
+    #[test]
+    fn setup_style_keeps_dark_theme_when_system_is_light() {
+        let ctx = egui::Context::default();
+        let input = egui::RawInput { system_theme: Some(egui::Theme::Light), ..Default::default() };
+        let _ = ctx.run(input, |ctx| setup_style(ctx));
+        assert_eq!(ctx.theme(), egui::Theme::Dark);
+    }
 
     #[test]
     fn odhoz_text_limit_truncates_utf8_at_boundary() {

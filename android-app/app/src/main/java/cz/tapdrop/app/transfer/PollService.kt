@@ -68,6 +68,14 @@ class PollService : Service() {
                 val pending = api.pending()
                 failures = 0
                 PollBus.connected.value = true
+                if (prefs.sendWhenOnline) {
+                    prefs.sendWhenOnline = false
+                    if (prefs.queue.isNotEmpty() && !TransferBus.ui.value.active) {
+                        TransferService.start(applicationContext, TransferService.ACTION_UPLOAD)
+                        delay(4000)
+                        continue
+                    }
+                }
                 if (pending.isNotEmpty() && prefs.autoDownload && !TransferBus.ui.value.active) {
                     TransferService.start(applicationContext, TransferService.ACTION_DOWNLOAD)
                     delay(4000) // dej službě čas se rozjet

@@ -225,11 +225,28 @@ fun SendScreen(nav: NavController) {
         if (!prefs.paired) {
             Button(onClick = { nav.navigate("pair") }, Modifier.fillMaxWidth()) { Text("Nejdřív spárovat s notebookem") }
         } else {
+            val online by PollBus.connected.collectAsState()
+            val waiting = prefs.sendWhenOnline && prefs.queue.isNotEmpty()
             Button(
-                onClick = { TransferService.start(ctx, TransferService.ACTION_UPLOAD) },
+                onClick = {
+                    when {
+                        waiting -> prefs.sendWhenOnline = false            // zrušit čekání
+                        online == false -> prefs.sendWhenOnline = true     // offline: držet do připojení
+                        else -> TransferService.start(ctx, TransferService.ACTION_UPLOAD)
+                    }
+                },
                 Modifier.fillMaxWidth().height(56.dp),
                 enabled = prefs.queue.isNotEmpty() && !ui.active,
-            ) { Icon(Icons.AutoMirrored.Rounded.Send, null); Spacer(Modifier.size(8.dp)); Text("Odeslat do notebooku") }
+            ) {
+                Icon(Icons.AutoMirrored.Rounded.Send, null); Spacer(Modifier.size(8.dp))
+                Text(
+                    when {
+                        waiting -> "Čeká na připojení… (zrušit)"
+                        online == false -> "Odeslat po připojení"
+                        else -> "Odeslat do notebooku"
+                    }
+                )
+            }
         }
         Spacer(Modifier.height(12.dp))
     }

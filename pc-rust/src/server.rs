@@ -3,7 +3,7 @@
 use crate::state::*;
 use axum::{
     body::Body,
-    extract::{DefaultBodyLimit, Multipart, Path as AxPath, Query, Request, State},
+    extract::{ConnectInfo, DefaultBodyLimit, Multipart, Path as AxPath, Query, Request, State},
     http::{header, HeaderMap, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Response},
@@ -41,7 +41,7 @@ pub async fn run(shared: S, listener: std::net::TcpListener) {
         .layer(middleware::from_fn_with_state(shared.clone(), auth))
         .with_state(shared);
     tracing::info!("HTTP server naslouchá na {:?}", listener.local_addr());
-    if let Err(e) = axum::serve(listener, app).await {
+    if let Err(e) = axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>()).await {
         tracing::error!("Server skončil chybou: {e}");
     }
 }
@@ -72,7 +72,7 @@ fn ct_eq(a: &str, b: &str) -> bool {
     a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
-async fn auth(State(s): State<S>, req: Request, next: Next) -> Response {
+async fn auth(State(s): State<S>, ConnectInfo(addr): ConnectInfo<std::net::SocketAddr>, req: Request, next: Next) -> Response {
     let ok = req
         .headers()
         .get("x-tapdrop-token")
@@ -80,6 +80,7 @@ async fn auth(State(s): State<S>, req: Request, next: Next) -> Response {
         .map(|t| ct_eq(t, &s.token()))
         .unwrap_or(false);
     if ok {
+        s.touch_phone(addr.ip().to_string());
         next.run(req).await
     } else {
         tracing::warn!("Zamítnuto (401): {} {}", req.method(), req.uri().path());

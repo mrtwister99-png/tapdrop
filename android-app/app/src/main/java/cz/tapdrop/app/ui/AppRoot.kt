@@ -4,7 +4,19 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import cz.tapdrop.app.transfer.PollBus
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Send
@@ -51,6 +63,14 @@ private val tabs = listOf(
     TabDef("settings", "Nastavení", Icons.Rounded.Settings),
 )
 
+/** Trvalé kolečko vlevo nahoře: zelené = připojeno k notebooku, šedé/tmavé = vypnuto / nepřipojeno. */
+@Composable
+private fun StatusDot() {
+    val connected by PollBus.connected.collectAsState()
+    val color = if (connected == true) Color(0xFF2EB365) else Color(0xFF55585E)
+    Box(Modifier.size(14.dp).clip(CircleShape).background(color))
+}
+
 private fun titleFor(route: String?) = when (route) {
     "home" -> "TapDrop"
     "send" -> "Odeslat do notebooku"
@@ -86,9 +106,13 @@ fun AppRoot() {
             CenterAlignedTopAppBar(
                 title = { Text(titleFor(current)) },
                 navigationIcon = {
-                    if (!isTab && current != null) {
-                        IconButton(onClick = { nav.popBackStack() }) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Zpět")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Spacer(Modifier.width(16.dp))
+                        StatusDot()
+                        if (!isTab && current != null) {
+                            IconButton(onClick = { nav.popBackStack() }) {
+                                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Zpět")
+                            }
                         }
                     }
                 },
