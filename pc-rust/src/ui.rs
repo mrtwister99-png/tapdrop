@@ -540,8 +540,14 @@ impl TapDropApp {
                 .hint_text("Sem napiš text…"),
         );
         if response.changed() {
+            let normalized = normalize_odhoz_text(&self.odhoz_text);
+            let was_limited = normalized.len() != self.odhoz_text.len();
+            self.odhoz_text = normalized;
             self.shared.set_odhoz_text(self.odhoz_text.clone());
             self.odhoz_remote = self.odhoz_text.clone();
+            if was_limited {
+                self.say("Text byl omezen na 1 MiB.");
+            }
         }
 
         ui.add_space(8.0);
@@ -671,4 +677,28 @@ fn empty_state(ui: &mut egui::Ui, title: &str, text: &str) {
         ui.label(RichText::new(title).size(16.0).color(Color32::GRAY));
         ui.label(RichText::new(text).weak().small());
     });
+}
+
+fn normalize_odhoz_text(text: &str) -> String {
+    if text.len() <= 1_048_576 {
+        return text.to_string();
+    }
+    let mut end = 1_048_576;
+    while end > 0 && !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    text[..end].to_string()
+}
+
+#[cfg(test)]
+mod odhoz_ui_tests {
+    use super::*;
+
+    #[test]
+    fn odhoz_text_limit_truncates_utf8_at_boundary() {
+        let text = "a".repeat(1_048_575) + "š";
+        let normalized = normalize_odhoz_text(&text);
+        assert!(normalized.len() <= 1_048_576);
+        assert!(normalized.is_char_boundary(normalized.len()));
+    }
 }

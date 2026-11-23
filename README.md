@@ -27,7 +27,13 @@ cargo build --release
 
 Výsledek: `pc-rust\target\release\TapDrop.exe` – jeden samostatný soubor, stačí ho zkopírovat kamkoli.
 
-Hotový **instalátor** (`TapDrop-Setup.exe`) se staví přes [Inno Setup](https://jrsoftware.org/isinfo.php): `ISCC.exe installer	apdrop.iss` → `distTapDrop-Setup.exe`.
+Hotový **instalátor** (`TapDrop-Setup.exe`) se staví přes [Inno Setup](https://jrsoftware.org/isinfo.php):
+
+```powershell
+ISCC.exe installer\tapdrop.iss
+```
+
+Výsledek: `dist\TapDrop-Setup.exe`. Skript bere EXE přímo z `pc-rust\target\release\TapDrop.exe`.
 
 ### Android aplikace
 

@@ -10,6 +10,7 @@ AppId={{7B1E5C52-3D0A-4F6B-9C4E-7A2D1F8E9B10}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher=TapDrop
+SetupIconFile=..\pc-rust\TapDrop.ico
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
@@ -35,7 +36,7 @@ Name: "autostart"; Description: "Spouštět TapDrop při startu Windows (do liš
 Name: "firewall"; Description: "Povolit TapDrop ve Windows Firewallu (soukromé sítě)"; GroupDescription: "Další:"; Check: IsAdminInstallMode
 
 [Files]
-Source: "..\dist\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\pc-rust\target\release\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExe}"
