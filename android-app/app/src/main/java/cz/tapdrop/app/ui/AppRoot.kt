@@ -7,10 +7,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,7 +44,8 @@ private data class TabDef(val route: String, val label: String, val icon: ImageV
 
 private val tabs = listOf(
     TabDef("home", "Domů", Icons.Rounded.Home),
-    TabDef("send", "Odeslat", Icons.Rounded.Send),
+    TabDef("send", "Odeslat", Icons.AutoMirrored.Rounded.Send),
+    TabDef("odhoz", "Odhoz", Icons.Rounded.Description),
     TabDef("received", "Přijato", Icons.Rounded.Download),
     TabDef("history", "Historie", Icons.Rounded.History),
     TabDef("settings", "Nastavení", Icons.Rounded.Settings),
@@ -52,6 +54,7 @@ private val tabs = listOf(
 private fun titleFor(route: String?) = when (route) {
     "home" -> "TapDrop"
     "send" -> "Odeslat do notebooku"
+    "odhoz" -> "Odhoz"
     "received" -> "Přijato z notebooku"
     "history" -> "Historie"
     "settings" -> "Nastavení"
@@ -124,6 +127,7 @@ fun AppRoot() {
         ) {
             composable("home") { HomeScreen(nav) }
             composable("send") { SendScreen(nav) }
+            composable("odhoz") { OdhozScreen(snack) }
             composable("received") { ReceivedScreen(snack) }
             composable("history") { HistoryScreen() }
             composable("settings") { SettingsScreen(nav, snack) }

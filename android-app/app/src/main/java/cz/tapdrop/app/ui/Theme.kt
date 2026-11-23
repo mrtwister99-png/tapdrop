@@ -1,40 +1,46 @@
 package cz.tapdrop.app.ui
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 
-private val Blue = Color(0xFF4C8BF5)
+private val Blue = Color(0xFF4058C7)
+private val Green = Color(0xFF2EB365)
 
 private val Dark = darkColorScheme(
     primary = Blue,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFF1E3A6B),
-    background = Color(0xFF14171E),
-    surface = Color(0xFF14171E),
-    surfaceContainer = Color(0xFF1E222C),
-    surfaceVariant = Color(0xFF262B37),
+    primaryContainer = Color(0xFF252A33),
+    background = Color(0xFF121212),
+    surface = Color(0xFF1A1A1A),
+    surfaceContainer = Color(0xFF232323),
+    surfaceVariant = Color(0xFF303030),
+    outline = Color(0xFF8A8A8A),
+    onSurface = Color(0xFFF7F7F7),
+    onSurfaceVariant = Color(0xFFC7C7C7),
 )
-private val Light = lightColorScheme(primary = Color(0xFF2F6FE0))
+private val Light = lightColorScheme(
+    primary = Blue,
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFE7EAF9),
+    background = Color(0xFFFAFAFA),
+    surface = Color(0xFFFFFFFF),
+    surfaceContainer = Color(0xFFF1F1F1),
+    surfaceVariant = Color(0xFFE8E8E8),
+    outline = Color(0xFF777777),
+    onSurface = Color(0xFF171717),
+    onSurfaceVariant = Color(0xFF525252),
+)
 
-val OkGreen = Color(0xFF3DBE78)
+val OkGreen = Green
 val WarnRed = Color(0xFFE5534B)
 
 @Composable
 fun TapTheme(content: @Composable () -> Unit) {
     val dark = isSystemInDarkTheme()
-    val ctx = LocalContext.current
-    val scheme = when {
-        Build.VERSION.SDK_INT >= 31 -> if (dark) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
-        dark -> Dark
-        else -> Light
-    }
+    val scheme = if (dark) Dark else Light
     MaterialTheme(colorScheme = scheme, content = content)
 }

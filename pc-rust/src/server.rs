@@ -19,6 +19,7 @@ use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tokio_util::io::ReaderStream;
 
 type S = Arc<Shared>;
+const MAX_ODHOZ_BYTES: usize = 1_048_576;
 
 pub async fn run(shared: S, listener: std::net::TcpListener) {
     let listener = match tokio::net::TcpListener::from_std(listener) {
@@ -35,12 +36,31 @@ pub async fn run(shared: S, listener: std::net::TcpListener) {
         .route("/ack/:id", post(ack))
         .route("/upload", post(upload))
         .route("/upload/status", get(upload_status))
+        .route("/odhoz", get(get_odhoz).put(put_odhoz))
         .layer(DefaultBodyLimit::disable())
         .layer(middleware::from_fn_with_state(shared.clone(), auth))
         .with_state(shared);
     tracing::info!("HTTP server naslouchá na {:?}", listener.local_addr());
     if let Err(e) = axum::serve(listener, app).await {
         tracing::error!("Server skončil chybou: {e}");
+    }
+}
+
+#[cfg(test)]
+mod odhoz_tests {
+    use super::*;
+
+    #[test]
+    fn odhoz_rejects_text_over_limit() {
+        assert_eq!(
+            validate_odhoz_text(&"x".repeat(MAX_ODHOZ_BYTES + 1)),
+            Err(StatusCode::PAYLOAD_TOO_LARGE)
+        );
+    }
+
+    #[test]
+    fn odhoz_accepts_empty_text() {
+        assert_eq!(validate_odhoz_text(""), Ok(()));
     }
 }
 
@@ -75,6 +95,29 @@ async fn discover(State(s): State<S>) -> Response {
     let id = s.lock().config.notebook_id.clone();
     let name = hostname::get().map(|h| h.to_string_lossy().to_string()).unwrap_or_else(|_| "TapDrop".into());
     Json(json!({"id": id, "name": name, "version": VERSION})).into_response()
+}
+
+fn validate_odhoz_text(text: &str) -> Result<(), StatusCode> {
+    if text.len() > MAX_ODHOZ_BYTES {
+        Err(StatusCode::PAYLOAD_TOO_LARGE)
+    } else {
+        Ok(())
+    }
+}
+
+async fn get_odhoz(State(s): State<S>) -> Response {
+    Json(json!({"text": s.odhoz_text()})).into_response()
+}
+
+async fn put_odhoz(State(s): State<S>, Json(body): Json<serde_json::Value>) -> Response {
+    let Some(text) = body.get("text").and_then(|v| v.as_str()) else {
+        return err(StatusCode::BAD_REQUEST, "Pole text je povinné");
+    };
+    if let Err(code) = validate_odhoz_text(text) {
+        return (code, Json(json!({"error": "Text je větší než 1 MiB"}))).into_response();
+    }
+    s.set_odhoz_text(text.to_string());
+    Json(json!({"ok": true, "text": text})).into_response()
 }
 
 async fn pending(State(s): State<S>) -> Response {

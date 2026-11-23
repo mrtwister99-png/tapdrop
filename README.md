@@ -4,6 +4,7 @@ Přenos souborů mezi telefonem a notebookem v **lokální WiFi** – spárován
 
 * **Telefon → notebook:** v aplikaci vybereš soubory a stiskneš „Odeslat do notebooku“. Uloží se do `~/TapDrop` na PC.
 * **Notebook → telefon (bez potvrzení):** přetáhneš soubory do okna TapDrop na PC a telefon si je **hned sám stáhne** do `Stažené/TapDrop` – žádný dialog. Telefon na pozadí hlídá notebook (zapnuto ve výchozím stavu).
+* **Obousměrný text „Odhoz“:** na telefonu i PC můžeš psát text, odeslat ho na druhou stranu a zkopírovat celý obsah nebo jeho označenou část.
 
 ## Struktura repozitáře
 
@@ -26,7 +27,13 @@ cargo build --release
 
 Výsledek: `pc-rust\target\release\TapDrop.exe` – jeden samostatný soubor, stačí ho zkopírovat kamkoli.
 
-Hotový **instalátor** (`TapDrop-Setup.exe`) se staví přes [Inno Setup](https://jrsoftware.org/isinfo.php): `ISCC.exe installer	apdrop.iss` → `distTapDrop-Setup.exe`.
+Hotový **instalátor** (`TapDrop-Setup.exe`) se staví přes [Inno Setup](https://jrsoftware.org/isinfo.php):
+
+```powershell
+ISCC.exe installer\tapdrop.iss
+```
+
+Výsledek: `dist\TapDrop-Setup.exe`. Skript bere EXE přímo z `pc-rust\target\release\TapDrop.exe`.
 
 ### Android aplikace
 
@@ -42,10 +49,11 @@ Soubor `local.properties` s cestou k Android SDK si Android Studio vytvoří sam
 
 ## Použití – krok za krokem
 
-1. **Spusť PC program** (`TapDrop.exe`). Při prvním spuštění povol Windows Firewall pro *soukromé sítě*. V okně uvidíš „● Běží“, IP, `NOTEBOOK_ID`, `TOKEN` a QR kód. Okno má záložky Přehled, Historie a Nastavení; zavření okna program skryje do lišty u hodin.
+1. **Spusť PC program** (`TapDrop.exe`). Při prvním spuštění povol Windows Firewall pro *soukromé sítě*. V okně uvidíš „● Běží“, IP, `NOTEBOOK_ID`, `TOKEN` a QR kód. Okno má záložky Přehled, Odhoz, Historie a Nastavení; zavření okna program skryje do lišty u hodin.
 2. **Spáruj telefon přes QR.** V aplikaci *Domů* → **Spárovat s notebookem** → naskenuj QR z okna PC. Hotovo, telefon i notebook musí být ve stejné WiFi.
 3. **Test telefon → PC.** Záložka *Odeslat* → vyber soubor → **Odeslat do notebooku**. Uvidíš % / rychlost / zbývající čas, notifikaci „Odesláno“ a soubor je v `~/TapDrop` i v okně PC.
 4. **Test PC → telefon bez potvrzení.** Přetáhni soubor do okna TapDrop na PC → během pár sekund ho telefon sám stáhne (notifikace „Staženo: X souborů“), soubor zmizí z fronty „Čeká na stažení“.
+5. **Test textu Odhoz.** V telefonu otevři záložku *Odhoz*, napiš text a stiskni „Odeslat text“; na PC otevři záložku *Odhoz* a text se objeví. Můžeš také napsat text na PC a načíst ho v telefonu. Maximální velikost textu je 1 MiB.
 
 Automatické stahování a běh na pozadí jdou vypnout v *Nastavení* aplikace (výchozí je zapnuto). Telefon přenos vždy spouští i ručně tlačítkem „Stáhnout teď“.
 
@@ -69,6 +77,8 @@ Všechny endpointy vyžadují hlavičku `X-TapDrop-Token`, jinak odpoví `401`.
 | `GET` | `/download/{id}` | stažení souboru (podporuje `Range`) |
 | `POST` | `/ack/{id}` | odstraní soubor z fronty (originál na disku se nemaže) |
 | `GET` | `/discover` | `{ "id", "name", "version" }` |
+| `GET` | `/odhoz` | `{ "text" }` – vrátí aktuální sdílený text |
+| `PUT` | `/odhoz` | `{"text":"..."}` – uloží aktuální sdílený text (max 1 MiB) |
 
 Příklady `curl` najdeš v `scripts/test-api.sh`:
 

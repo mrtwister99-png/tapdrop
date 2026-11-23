@@ -1,6 +1,9 @@
 package cz.tapdrop.app.ui
 
 import android.content.Intent
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -28,8 +31,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Description
@@ -38,7 +43,6 @@ import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -50,6 +54,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -224,7 +229,89 @@ fun SendScreen(nav: NavController) {
                 onClick = { TransferService.start(ctx, TransferService.ACTION_UPLOAD) },
                 Modifier.fillMaxWidth().height(56.dp),
                 enabled = prefs.queue.isNotEmpty() && !ui.active,
-            ) { Icon(Icons.Rounded.Send, null); Spacer(Modifier.size(8.dp)); Text("Odeslat do notebooku") }
+            ) { Icon(Icons.AutoMirrored.Rounded.Send, null); Spacer(Modifier.size(8.dp)); Text("Odeslat do notebooku") }
+        }
+        Spacer(Modifier.height(12.dp))
+    }
+}
+
+// ============================================================ ODHOZ
+@Composable
+fun OdhozScreen(snack: SnackbarHostState) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var text by remember { mutableStateOf("") }
+    var status by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+
+    fun load() {
+        scope.launch {
+            busy = true
+            status = ""
+            try {
+                val api = Discovery.connect(ctx, TapApp.prefs)
+                text = api.getOdhoz()
+                status = "Text načtený z notebooku"
+            } catch (e: Exception) {
+                status = "Nelze načíst text: ${e.message ?: "spojení selhalo"}"
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) { load() }
+
+    Column(
+        Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Spacer(Modifier.height(8.dp))
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it },
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            label = { Text("Text pro notebook") },
+            supportingText = if (status.isNotEmpty()) ({ Text(status) }) else null,
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedButton(
+                onClick = {
+                    val clipboard = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("TapDrop Odhoz", text))
+                    scope.launch { snack.showSnackbar("Text zkopírován") }
+                },
+                Modifier.weight(1f).height(48.dp),
+                enabled = text.isNotEmpty(),
+            ) {
+                Icon(Icons.Rounded.ContentCopy, null)
+                Spacer(Modifier.size(8.dp))
+                Text("Kopírovat vše")
+            }
+            OutlinedButton(onClick = { load() }, Modifier.weight(1f).height(48.dp), enabled = !busy) {
+                Text("Načíst")
+            }
+        }
+        Button(
+            onClick = {
+                scope.launch {
+                    busy = true
+                    status = ""
+                    try {
+                        val api = Discovery.connect(ctx, TapApp.prefs)
+                        api.setOdhoz(text)
+                        status = "Text odeslán do notebooku"
+                    } catch (e: Exception) {
+                        status = "Text se nepodařilo odeslat: ${e.message ?: "spojení selhalo"}"
+                    } finally {
+                        busy = false
+                    }
+                }
+            },
+            Modifier.fillMaxWidth().height(56.dp),
+            enabled = !busy,
+        ) {
+            Text("Odeslat text")
         }
         Spacer(Modifier.height(12.dp))
     }

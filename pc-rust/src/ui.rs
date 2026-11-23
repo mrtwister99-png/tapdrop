@@ -10,10 +10,10 @@ use tray_icon::{TrayIcon, TrayIconBuilder, TrayIconEvent};
 
 static QUITTING: AtomicBool = AtomicBool::new(false);
 
-const ACCENT: Color32 = Color32::from_rgb(76, 139, 245);
-const OK_GREEN: Color32 = Color32::from_rgb(70, 190, 120);
-const CARD: Color32 = Color32::from_rgb(24, 46, 92);
-const BG: Color32 = Color32::from_rgb(10, 22, 50);
+const ACCENT: Color32 = Color32::from_rgb(64, 88, 199);
+const OK_GREEN: Color32 = Color32::from_rgb(46, 179, 101);
+const CARD: Color32 = Color32::from_rgb(35, 35, 35);
+const BG: Color32 = Color32::from_rgb(18, 18, 18);
 
 pub fn run(shared: Arc<Shared>, start_hidden: bool) {
     let (w, h) = {
@@ -50,13 +50,13 @@ fn make_icon(size: u32) -> Vec<u8> {
             let i = ((y * size + x) * 4) as usize;
             let (r, g, b, a) = if d <= c - 1.0 {
                 if d < c * 0.38 {
-                    (255, 255, 255, 255)
+                    (46, 179, 101, 255)
                 } else if d < c * 0.55 {
-                    (76, 139, 245, 255)
+                    (64, 88, 199, 255)
                 } else if d > c * 0.66 && d < c * 0.80 {
-                    (255, 255, 255, 235)
+                    (204, 204, 204, 235)
                 } else {
-                    (76, 139, 245, 255)
+                    (64, 88, 199, 255)
                 }
             } else {
                 (0, 0, 0, 0)
@@ -70,6 +70,7 @@ fn make_icon(size: u32) -> Vec<u8> {
 #[derive(PartialEq, Clone, Copy)]
 enum Tab {
     Home,
+    Odhoz,
     History,
     Settings,
 }
@@ -91,6 +92,8 @@ struct TapDropApp {
     status_msg: Option<(String, Instant)>,
     last_size: (f32, f32),
     last_size_change: Option<Instant>,
+    odhoz_text: String,
+    odhoz_remote: String,
 }
 
 impl TapDropApp {
@@ -115,6 +118,8 @@ impl TapDropApp {
             status_msg: None,
             last_size: (w, h),
             last_size_change: None,
+            odhoz_text: String::new(),
+            odhoz_remote: String::new(),
         }
     }
 
@@ -126,8 +131,8 @@ impl TapDropApp {
 fn setup_style(ctx: &egui::Context) {
     let mut v = egui::Visuals::dark();
     v.panel_fill = BG;
-    v.window_fill = Color32::from_rgb(14, 30, 64);
-    v.extreme_bg_color = Color32::from_rgb(8, 16, 38);
+    v.window_fill = Color32::from_rgb(26, 26, 26);
+    v.extreme_bg_color = Color32::from_rgb(18, 18, 18);
     v.widgets.noninteractive.bg_fill = CARD;
     v.selection.bg_fill = ACCENT;
     v.hyperlink_color = ACCENT;
@@ -298,6 +303,12 @@ impl eframe::App for TapDropApp {
             ctx.request_repaint_after(Duration::from_secs(2));
         }
 
+        let odhoz_remote = self.shared.odhoz_text();
+        if odhoz_remote != self.odhoz_remote {
+            self.odhoz_remote = odhoz_remote.clone();
+            self.odhoz_text = odhoz_remote;
+        }
+
         let uri = net::pair_uri(&self.shared);
         if self.qr.0 != uri {
             let (m, w) = qr_matrix(&uri);
@@ -316,6 +327,7 @@ impl eframe::App for TapDropApp {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.selectable_value(&mut self.tab, Tab::Settings, "Nastavení");
                     ui.selectable_value(&mut self.tab, Tab::History, "Historie");
+                    ui.selectable_value(&mut self.tab, Tab::Odhoz, "Odhoz");
                     ui.selectable_value(&mut self.tab, Tab::Home, "Přehled");
                 });
             });
@@ -369,6 +381,7 @@ impl eframe::App for TapDropApp {
 
         egui::CentralPanel::default().show(ctx, |ui| match self.tab {
             Tab::Home => self.home(ui, ctx, hovering, &cfg, &queue, &received, &progress, &mut actions),
+            Tab::Odhoz => self.odhoz_tab(ui, ctx),
             Tab::History => self.history_tab(ui, &history),
             Tab::Settings => self.settings(ui, &cfg),
         });
@@ -515,6 +528,37 @@ impl TapDropApp {
         });
     }
 
+    fn odhoz_tab(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        ui.label(RichText::new("Odhoz").strong().size(18.0));
+        ui.label(RichText::new("Text se synchronizuje s telefonem po napsání nebo načtení.").weak());
+        ui.add_space(8.0);
+
+        let response = ui.add_sized(
+            [ui.available_width(), (ui.available_height() - 58.0).max(200.0)],
+            egui::TextEdit::multiline(&mut self.odhoz_text)
+                .desired_rows(16)
+                .hint_text("Sem napiš text…"),
+        );
+        if response.changed() {
+            let normalized = normalize_odhoz_text(&self.odhoz_text);
+            let was_limited = normalized.len() != self.odhoz_text.len();
+            self.odhoz_text = normalized;
+            self.shared.set_odhoz_text(self.odhoz_text.clone());
+            self.odhoz_remote = self.odhoz_text.clone();
+            if was_limited {
+                self.say("Text byl omezen na 1 MiB.");
+            }
+        }
+
+        ui.add_space(8.0);
+        ui.horizontal(|ui| {
+            if ui.add_sized([ui.available_width(), 44.0], egui::Button::new("Zkopírovat vše")).clicked() {
+                ctx.copy_text(self.odhoz_text.clone());
+                self.say("Text zkopírován");
+            }
+        });
+    }
+
     fn history_tab(&mut self, ui: &mut egui::Ui, history: &[HistoryEntry]) {
         ui.horizontal(|ui| {
             ui.label(RichText::new(format!("Historie přenosů ({})", history.len())).strong().size(18.0));
@@ -633,4 +677,28 @@ fn empty_state(ui: &mut egui::Ui, title: &str, text: &str) {
         ui.label(RichText::new(title).size(16.0).color(Color32::GRAY));
         ui.label(RichText::new(text).weak().small());
     });
+}
+
+fn normalize_odhoz_text(text: &str) -> String {
+    if text.len() <= 1_048_576 {
+        return text.to_string();
+    }
+    let mut end = 1_048_576;
+    while end > 0 && !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    text[..end].to_string()
+}
+
+#[cfg(test)]
+mod odhoz_ui_tests {
+    use super::*;
+
+    #[test]
+    fn odhoz_text_limit_truncates_utf8_at_boundary() {
+        let text = "a".repeat(1_048_575) + "š";
+        let normalized = normalize_odhoz_text(&text);
+        assert!(normalized.len() <= 1_048_576);
+        assert!(normalized.is_char_boundary(normalized.len()));
+    }
 }

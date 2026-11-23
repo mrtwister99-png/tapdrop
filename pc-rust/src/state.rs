@@ -79,6 +79,7 @@ pub struct Inner {
     pub received: Vec<Received>,
     pub history: Vec<HistoryEntry>,
     pub progress: HashMap<String, Progress>,
+    pub odhoz_text: String,
 }
 
 pub struct Shared {
@@ -200,7 +201,7 @@ impl Shared {
         let received: Vec<Received> = load_json(&dir.join("received.json")).unwrap_or_default();
         let history: Vec<HistoryEntry> = load_json(&dir.join("history.json")).unwrap_or_default();
         let s = Arc::new(Shared {
-            inner: Mutex::new(Inner { config, queue, received, history, progress: HashMap::new() }),
+            inner: Mutex::new(Inner { config, queue, received, history, progress: HashMap::new(), odhoz_text: String::new() }),
             dir,
             ctx: Mutex::new(None),
         });
@@ -229,6 +230,15 @@ impl Shared {
 
     pub fn token(&self) -> String {
         self.lock().config.token.clone()
+    }
+
+    pub fn odhoz_text(&self) -> String {
+        self.lock().odhoz_text.clone()
+    }
+
+    pub fn set_odhoz_text(&self, text: String) {
+        self.lock().odhoz_text = text;
+        self.repaint();
     }
 
     pub fn save_config(&self) {
