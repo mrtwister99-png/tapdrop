@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="tap_bg">#FF14171E</color>
-    <color name="tap_blue">#FF4C8BF5</color>
+    <color name="tap_bg">#FF121212</color>
+    <color name="tap_blue">#FF4058C7</color>
+    <color name="tap_green">#FF2EB365</color>
     <color name="tap_white">#FFFFFFFF</color>
 </resources>
